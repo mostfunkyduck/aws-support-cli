@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+import boto3
+import argparse
+import logging
+
+class Case:
+    def __init__(self, blob, client):
+        self._blob = blob
+        self.client = client
+
+    def displayID(self):
+        return self._blob['displayId']
+
+    def subject(self):
+        return self._blob['subject']
+
+    def status(self):
+        return self._blob['status']
+
+    def communications(self):
+        paginator = self.client.get_paginator('describe_communications')
+        i = paginator.paginate(
+            caseId=self._blob['caseId'],
+        )
+        for each in i:
+            for comm in each['communications']:
+                yield comm
+
+class Client:
+    def __init__(self):
+        self.client = boto3.client('support')
+    
+    def list_cases(self):
+        cases = self.client.describe_cases(
+            includeCommunications=False,
+            includeResolvedCases=False 
+        )['cases']
+        for case in cases:
+            yield Case(case, self.client) 
+
+    def list(self):
+        for case in self.list_cases():
+            print('---')
+            print(f'Case # : {case.displayID()}')
+            print(f'Subject: {case.subject()}')
+            print(f'Status : {case.status()}')
+          
+    def details(self, caseid):
+        full_case = Case(self.client.describe_cases(
+            displayId=caseid,
+            includeCommunications=True,
+            includeResolvedCases=True
+        )['cases'][0], self.client)
+        print('---')
+        print(f'Case # : {full_case.displayID()}')
+        print(f'Subject: {full_case.subject()}')
+        print(f'Status : {full_case.status()}')
+
+        # reverse the comms to make them chronologically ordered
+        comms = reversed([c for c in full_case.communications()])
+        for comm in comms:
+            print('###')
+            print(f'ID: {comm["caseId"]}')
+            print(f'Submitted by: {comm["submittedBy"]}')
+            print(f'Time created: {comm["timeCreated"]}')
+            print(f'Attachments: {f["fileName"] for f in comm["attachmentSet"]}')
+            print(f'Body:\n{comm["body"]}') 
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='command')
+
+    subparsers.add_parser('list', help='show all unresolved cases')
+    p = subparsers.add_parser('details', help='show details on one case')
+    p.add_argument('--caseid', required=True, help='the display ID of the case to look up')
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    logging.getLogger().setLevel(logging.DEBUG)
+    client = Client()
+    if args.command == 'list':
+        client.list()
+    elif args.command == 'details':
+        client.details(args.caseid)
+
+
+main()
