@@ -28,7 +28,7 @@ class Case:
 
 class Client:
     def __init__(self):
-        self.client = boto3.client('support')
+        self.client = boto3.client('support', region_name='us-east-1')
     
     def list_cases(self):
         cases = self.client.describe_cases(
@@ -63,16 +63,32 @@ class Client:
             print(f'ID: {comm["caseId"]}')
             print(f'Submitted by: {comm["submittedBy"]}')
             print(f'Time created: {comm["timeCreated"]}')
-            print(f'Attachments: {f["fileName"] for f in comm["attachmentSet"]}')
-            print(f'Body:\n{comm["body"]}') 
+            print('Attachments:')
+            for f in comm["attachmentSet"]:
+                print(f'\t{f["fileName"]}:\t{f["attachmentId"]}')
+            print(f'Body:\n{comm["body"]}')
+
+    def attachment(self, attachmentid, outputfile):
+        blob = self.client.describe_attachment(
+            attachmentId=attachmentid
+        )
+
+        with open(outputfile, 'wb') as f:
+            f.write(blob['attachment']['data'])
 
 def parse_args():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='command')
 
     subparsers.add_parser('list', help='show all unresolved cases')
+    
     p = subparsers.add_parser('details', help='show details on one case')
-    p.add_argument('--caseid', required=True, help='the display ID of the case to look up')
+    p.add_argument('--case-id', required=True, help='the display ID of the case to look up')
+
+    p = subparsers.add_parser('attachment', help='retrieve an attachment')
+    p.add_argument('--attachment-id', required=True, help='the display ID of the case to look up')
+    p.add_argument('--output-file',   required=True, help='location to output attachment data')
+
     return parser.parse_args()
 
 
@@ -83,7 +99,9 @@ def main():
     if args.command == 'list':
         client.list()
     elif args.command == 'details':
-        client.details(args.caseid)
+        client.details(args.case_id)
+    elif args.command == 'attachment':
+        client.attachment(args.attachment_id, args.output_file)
 
 
 main()
