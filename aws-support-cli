@@ -66,7 +66,8 @@ class Client:
             print('Attachments:')
             for f in comm["attachmentSet"]:
                 print(f'\t{f["fileName"]}:\t{f["attachmentId"]}')
-            print(f'Body:\n{comm["body"]}')
+            print('\n')
+            print(f'Body:\n{comm["body"]}\n')
 
     def attachment(self, attachmentid, outputfile):
         blob = self.client.describe_attachment(
